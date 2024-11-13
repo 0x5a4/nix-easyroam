@@ -84,7 +84,7 @@
         script = ''
           openssl=${pkgs.libressl}/bin/openssl
 
-          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p " ''$(dirname ${str})"'') (
+          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p "''$(dirname ${str})"'') (
             with cfg.paths;
             [
               rootCert
