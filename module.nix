@@ -84,9 +84,14 @@
         script = ''
           openssl=${pkgs.libressl}/bin/openssl
 
-          mkdir -p "''${dirname ${cfg.paths.rootCert}}"
-          mkdir -p "''${dirname ${cfg.paths.clientCert}}"
-          mkdir -p "''${dirname ${cfg.paths.privateKey}}"
+          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p " ''$(dirname ${str})"'') (
+            with cfg.paths;
+            [
+              rootCert
+              clientCert
+              privateKey
+            ]
+          )}
 
           # root cert
           $openssl pkcs12 -in "${cfg.pkcsFile}" -cacerts -passin pass: -nokeys > ${cfg.paths.rootCert}
