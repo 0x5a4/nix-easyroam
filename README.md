@@ -11,7 +11,7 @@ It can also automatically setup `wpa_supplicant` (via `networking.wireless`)
 
 ## Usage
 
-### Step 1: Download the .p12 File
+### Step 1: Download the PKCS File
 
 Go to [easyroam.de](https://easyroam.de), select your University and log in. Under `Manual Options` select `PKCS12` and generate the profile.
 
