@@ -84,7 +84,9 @@
         script = ''
           openssl=${pkgs.libressl}/bin/openssl
 
-          mkdir -p /run/easyroam
+          mkdir -p "''${dirname ${cfg.paths.rootCert}}"
+          mkdir -p "''${dirname ${cfg.paths.clientCert}}"
+          mkdir -p "''${dirname ${cfg.paths.privateKey}}"
 
           # root cert
           $openssl pkcs12 -in "${cfg.pkcsFile}" -cacerts -passin pass: -nokeys > ${cfg.paths.rootCert}
