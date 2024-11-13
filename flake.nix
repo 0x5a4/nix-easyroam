@@ -4,6 +4,6 @@
   outputs =
     { ... }:
     {
-      nixosModules.easyroam = import ./module.nix;
+      nixosModules.nix-easyroam = import ./module.nix;
     };
 }
