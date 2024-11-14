@@ -103,6 +103,4 @@ services.easyroam = {
 
 ### Step 6: Repeat this every few months
 
-Because easyroam is so much easier, you need to redo this every once in a while.
-The Common Name stays the same, but the private key changes, so you need to redownload (and reencrypt)
-the p12 file (dont forget to point nix to it).
+Because easyroam is so much easier, you need to redo this every once in a while. You'll need to both replace the p12 file as well as reobtain the Common Name
