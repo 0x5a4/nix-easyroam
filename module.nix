@@ -94,13 +94,13 @@
           )}
 
           # root cert
-          $openssl pkcs12 -in "${cfg.pkcsFile}" -cacerts -passin pass: -nokeys > ${cfg.paths.rootCert}
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys -cacerts > ${cfg.paths.rootCert}
 
           # client cert 
           $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 > ${cfg.paths.clientCert}
 
           # private key
-          $openssl pkcs12 -in "${cfg.pkcsFile}" -nodes -nocerts -passin pass: | $openssl rsa -aes256 -passout pass:${cfg.privateKeyPassPhrase} > ${cfg.paths.privateKey}
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nocerts -nodes | $openssl rsa -aes256 -passout pass:${cfg.privateKeyPassPhrase} > ${cfg.paths.privateKey}
 
           # set permissions
           chmod ${cfg.mode} "${cfg.paths.rootCert}" "${cfg.paths.clientCert}" "${cfg.paths.privateKey}"

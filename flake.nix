@@ -42,8 +42,9 @@
                     exit
                 fi
 
-              openssl pkcs12 -in "$1" -passin pass: -nokeys | \
-                openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp'
+              # garbage hack to get stderr to shut the fuck up
+              bash -c "openssl pkcs12 -in \"$1\" -passin pass: -nokeys | \
+                openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp'" 2>/dev/null
             '';
           };
         }
