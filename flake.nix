@@ -38,7 +38,7 @@
 
             text = ''
                 if (( $# == 0 )); then
-                    echo "usage: extrac-common-name <pkcs-file>"
+                    echo "usage: extract-common-name <pkcs-file>"
                     exit
                 fi
 

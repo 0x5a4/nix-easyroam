@@ -9,23 +9,16 @@ This module aims to fix these issues by automatically extracting the pkcs file a
 a systemd service (similar to sops). You'll still need to redownload it every few months, but its much less tedious.
 It can also automatically setup `wpa_supplicant` (via `networking.wireless`)
 
+The extracted Common Name/Root Certificate/Client Certificate/Private Key end up in `/run/easyroam/`, so you
+can use them outside of `wpa_supplicant`.
+
 ## Usage
 
 ### Step 1: Download the PKCS File
 
 Go to [easyroam.de](https://easyroam.de), select your University and log in. Under `Manual Options` select `PKCS12` and generate the profile.
 
-### Step 2: Obtain your Common Name
-
-With the `.p12` file in Hand, run this command:
-
-```bash
-nix run github:0x5a4/nix-easyroam#extract-common-name file.p12
-```
-
-and write down the result. This is your identity/username.
-
-### Step 3 (optional): Encrypt the file using sops
+### Step 2 (optional): Encrypt the file using sops
 
 If you dont encrypt the file, it will be copied to the nix-store and will
 be world readable. You also cannot put it into a git repo or something
@@ -38,16 +31,19 @@ cp file.p12 secrets/easyroam
 sops encrypt -i secrets/easyroam
 
 # now setup the sops secret as usual
+# i recommend settings the secrets restartUnits to [ "easyroam-install-certs.service" ]
 ```
 
-### Step 4: Install the NixOS module
+### Step 3: Install the NixOS module
 
 Do something like this in your flake
 
 ```nix
 {
-    inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    inputs.nix-easyroam.url = "github:0x5a4/nix-easyroam";
+    inputs = {
+        nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+        nix-easyroam.url = "github:0x5a4/nix-easyroam";
+    };
 
     outputs = {nixpkgs, nix-easyroam, ...}: {
         nixosConfigurations.mysystem = nixpkgs.lib.nixosSystem {
@@ -61,7 +57,7 @@ Do something like this in your flake
 }
 ```
 
-### Step 5: Configure the Module
+### Step 4: Configure the Module
 
 Somewhere in your Nixos Config put:
 
@@ -69,19 +65,14 @@ Somewhere in your Nixos Config put:
 services.easyroam = {
     enable = true;
     pkcsFile = "/path/to/the/file.p12"; # or e.g. config.sops.secrets.easyroam.path
+    # its also possible to automatically configure wpa_supplicant
+    network.configure = true;
     # optional, if you want to override the passphrase for the private key file.
     # this doesnt need to be secret, since its useless without the private key file
     privateKeyPassPhrase = "";
-    # its also possible to automatically configure wpa_supplicant
-    network = {
-        configure = true;
-        # the common name you got earlier. this cannot be read from a file, due to
-        # limitations within wpa_supplicant. but putting this in your git repo should
-        # be fine, since its only the username
-        commonName = "";
-    };
     # optional, if you want to override where the extracted files end up
     # the defaults are:
+    # /run/easyroam/common-name/
     # /run/easyroam/root-certificate.pem
     # /run/easyroam/client-certificate.pem
     # /run/easyroam/private-key.pem
@@ -92,6 +83,7 @@ services.easyroam = {
        rootCert = "";
        clientCert = "";
        privateKey = "";
+       commonName = "";
     };
     # optional, (permission bits) the files are stored as, (default is 0400 (0r--------))
     mode = "";
@@ -101,6 +93,6 @@ services.easyroam = {
 };
 ```
 
-### Step 6: Repeat this every few months
+### Step 5: Repeat this every few months
 
-Because easyroam is so much easier, you need to redo this every once in a while. You'll need to both replace the p12 file as well as reobtain the Common Name
+Because easyroam is so much easier, you need to redo this every once in a while.
