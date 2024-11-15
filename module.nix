@@ -176,10 +176,7 @@ in
                 #end easyroam config
               '';
             };
-            nmNetworkBlock = pkgs.writeTextFile {
-              name = "easyroam-nm-network-block";
-              text = ini.generate "eduroam" networkManagerConfig;
-            };
+            nmNetworkBlock = ini.generate "easyroam-nm-network-block" networkManagerConfig;
           in
           ''
             openssl=${pkgs.libressl}/bin/openssl
