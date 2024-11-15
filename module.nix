@@ -4,83 +4,99 @@
   pkgs,
   ...
 }:
+let
+  types = lib.types;
+  ini = pkgs.formats.ini { };
+in
 {
-  options.services.easyroam =
-    let
-      types = lib.types;
-    in
-    {
-      enable = lib.mkEnableOption "setup easyroam wifi configuration";
-      pkcsFile = lib.mkOption {
-        type = types.either types.path types.str;
-        description = ''
-          Path to the PKCS12 File (downloaded from the easyroam site).
+  options.services.easyroam = {
+    enable = lib.mkEnableOption "setup easyroam wifi configuration";
+    pkcsFile = lib.mkOption {
+      type = types.either types.path types.str;
+      description = ''
+        Path to the PKCS12 File (downloaded from the easyroam site).
 
-          This will be extracted into the client certificate, root certificate and private key.
-        '';
-      };
-      privateKeyPassPhrase = lib.mkOption {
+        This will be extracted into the client certificate, root certificate and private key.
+      '';
+    };
+    privateKeyPassPhrase = lib.mkOption {
+      type = types.str;
+      default = "memezlmao";
+      description = ''
+        Passphrase for the private key file. This doesnt actually need to be secure,
+        since its useless without the specific private key file.
+      '';
+    };
+    paths = {
+      commonName = lib.mkOption {
         type = types.str;
-        default = "memezlmao";
-        description = ''
-          Passphrase for the private key file. This doesnt actually need to be secure,
-          since its useless without the specific private key file.
-        '';
+        description = "path to the common name file";
+        default = "/run/easyroam/common-name";
       };
-      paths = {
-        commonName = lib.mkOption {
-          type = types.str;
-          description = "path to the common name file";
-          default = "/run/easyroam/common-name";
-        };
-        rootCert = lib.mkOption {
-          type = types.str;
-          description = "path to the root certificate pem file";
-          default = "/run/easyroam/root-certificate.pem";
-        };
-        clientCert = lib.mkOption {
-          type = types.str;
-          description = "path to the client certificate pem file";
-          default = "/run/easyroam/client-certificate.pem";
-        };
-        privateKey = lib.mkOption {
-          type = types.str;
-          description = "path to the private key pem file";
-          default = "/run/easyroam/private-key.pem";
-        };
+      rootCert = lib.mkOption {
+        type = types.str;
+        description = "path to the root certificate pem file";
+        default = "/run/easyroam/root-certificate.pem";
       };
-      mode = lib.mkOption {
-        type = types.nullOr types.str;
-        default = "0400";
-        description = "mode (in octal notation) of the certificate files";
+      clientCert = lib.mkOption {
+        type = types.str;
+        description = "path to the client certificate pem file";
+        default = "/run/easyroam/client-certificate.pem";
       };
-      owner = lib.mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Owner of the certificate files";
-      };
-      group = lib.mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Group of the certificate files";
-      };
-      network = {
-        configure = lib.mkEnableOption "also configure the easyroam network (otherwise only extraction will happen)";
-        extraConfig = lib.mkOption {
-          type = types.lines;
-          default = "";
-          description = "Extra Config to write into the network Block";
-          example = ''
-            priority=5
-          '';
-        };
+      privateKey = lib.mkOption {
+        type = types.str;
+        description = "path to the private key pem file";
+        default = "/run/easyroam/private-key.pem";
       };
     };
+    mode = lib.mkOption {
+      type = types.nullOr types.str;
+      default = "0400";
+      description = "mode (in octal notation) of the certificate files";
+    };
+    owner = lib.mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Owner of the certificate files";
+    };
+    group = lib.mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Group of the certificate files";
+    };
+    network = {
+      configure = lib.mkEnableOption "also configure the easyroam network (otherwise only extraction will happen)";
+      wpa.extraConfig = lib.mkOption {
+        type = types.lines;
+        default = "";
+        description = "Extra Config to write into the network Block";
+        example = ''
+          priority=5
+        '';
+      };
+      nm.extraConfig = lib.mkOption {
+        type = ini.type;
+        default = { };
+        description = "Extra Config to write into the network manager config";
+      };
+      backend = lib.mkOption {
+        types = types.enum [
+          "wpa_supplicant"
+          "NetworkManager"
+        ];
+        default = "wpa_supplicant";
+        description = "Backend to use for configuring the network";
+      };
+    };
+  };
 
   config =
     let
       cfg = config.services.easyroam;
       wpaCfg = config.networking.wireless;
+
+      wantsWpa = cfg.network.configure && cfg.network.backend == "wpa_supplicant";
+      wantsNm = cfg.network.configure && cfg.network.backend == "NetworkManager";
 
       wpaUnitNames =
         if wpaCfg.interfaces == [ ] then
@@ -90,21 +106,55 @@
 
       wpaUnitServices = builtins.map (x: "${x}.service") wpaUnitNames;
 
+      unitDeps =
+        if cfg.network.backend == "wpa_supplicant" then wpaUnitServices else [ "NetworkManager.service" ];
+
+      networkManagerConfig = lib.recursiveUpdate cfg.network.nm.extraConfig {
+        connection = {
+          id = "eduroam";
+          type = "wifi";
+          interface-name = "wlp82s0";
+        };
+        wifi = {
+          mode = "infrastructure";
+          ssid = "eduroam";
+        };
+        wifi-security = {
+          auth-alg = "open";
+          key-mgmt = "wpa-eap";
+        };
+        "802-1x" = {
+          altsubject-matches = "DNS:easyroam.eduroam.de;";
+          ca-cert = "${cfg.paths.rootCert}";
+          client-cert = "${cfg.paths.clientCert}";
+          eap = "tls";
+          identity = "EASYROAM_IDENTITY_PLACEHOLDER";
+          private-key = cfg.paths.privateKey;
+          private-key-password = cfg.privateKeyPassPhrase;
+          private-key-password-flags = 0;
+        };
+        ipv4.method = "auto";
+        ipv6 = {
+          addr-gen-mode = "stable-privacy";
+          method = "auto";
+        };
+      };
+
       easyroam-unit = {
         wantedBy = [ "multi-user.target" ];
 
         wants = [
           "sops-install-secrets.service"
-        ] ++ (lib.optionals cfg.network.configure wpaUnitServices);
+        ] ++ (lib.optionals cfg.network.configure unitDeps);
 
-        before = lib.optionals cfg.network.configure wpaUnitServices;
+        before = lib.optionals cfg.network.configure unitDeps;
 
         serviceConfig.RemainAfterExit = "yes";
 
         script =
           let
-            networkBlock = pkgs.writeTextFile {
-              name = "easyroam-network-block";
+            wpaNetworkBlock = pkgs.writeTextFile {
+              name = "easyroam-wpa-network-block";
               text = ''
                 #begin easyroam config
                 network={
@@ -125,6 +175,10 @@
                 }
                 #end easyroam config
               '';
+            };
+            nmNetworkBlock = pkgs.writeTextFile {
+              name = "easyroam-nm-network-block";
+              text = ini.generate "eduroam" networkManagerConfig;
             };
           in
           ''
@@ -172,33 +226,44 @@
 
             echo pkcs file sucessfully extracted
 
-            ${lib.optionalString cfg.network.configure ''
+            ${lib.optionalString wantsWpa ''
               # set up wpa_supplicant
               if grep -q "#begin easyroam config" /etc/wpa_supplicant.conf; then
                 # dont know why this is necessary, but if we just make it one big pipe, one of the sed's
                 # gets a SIGPIPE and just dies.
-                NETWORK_BLOCK=$(sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${networkBlock}" | \
+                NETWORK_BLOCK=$(sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${wpaNetworkBlock}" | \
                   sed -re '/#begin easyroam config/,/#end easyroam config/{r /dev/stdin' -e 'd;}' /etc/wpa_supplicant.conf)
                 echo "$NETWORK_BLOCK" > /etc/wpa_supplicant.conf
               else
-                cat ${networkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
+                cat ${wpaNetworkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
               fi
+            ''}
+
+            ${lib.optionalString wantsNm ''
+              # set up NetworkManager
+              NMPATH=/run/NetworkManager/system-connections
+              mkdir -p "$NMPATH"
+              
+              sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
             ''}
           '';
       };
     in
     lib.mkIf cfg.enable {
       systemd.services = lib.mergeAttrsList [
-        (lib.optionalAttrs cfg.network.configure (
+        (lib.optionalAttrs wantsWpa (
           lib.genAttrs wpaUnitNames (x: {
             bindsTo = [ "easyroam-install-certs.service" ];
           })
         ))
+        (lib.optionalAttrs wantsNm {
+          NetworkManager.bindsTo = [ "easyroam-install-certs.service" ];
+        })
         {
           easyroam-install-certs = easyroam-unit;
         }
       ];
 
-      networking.wireless.allowAuxiliaryImperativeNetworks = lib.mkIf cfg.network.configure true;
+      networking.wireless.allowAuxiliaryImperativeNetworks = lib.mkIf wantsWpa true;
     };
 }
