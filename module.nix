@@ -80,7 +80,7 @@ in
         description = "Extra Config to write into the network manager config";
       };
       backend = lib.mkOption {
-        types = types.enum [
+        type = types.enum [
           "wpa_supplicant"
           "NetworkManager"
         ];
