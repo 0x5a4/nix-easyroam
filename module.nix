@@ -64,7 +64,17 @@
         default = null;
         description = "Group of the certificate files";
       };
-      network.configure = lib.mkEnableOption "also configure the easyroam network (otherwise only extraction will happen)";
+      network = {
+        configure = lib.mkEnableOption "also configure the easyroam network (otherwise only extraction will happen)";
+        extraConfig = lib.mkOption {
+          type = types.lines;
+          default = "";
+          description = "Extra Config to write into the network Block";
+          example = ''
+            priority=5
+          '';
+        };
+      };
     };
 
   config =
@@ -111,6 +121,7 @@
                    client_cert="${cfg.paths.clientCert}"
                    private_key="${cfg.paths.privateKey}"
                    private_key_passwd="${cfg.privateKeyPassPhrase}"
+                   ${cfg.network.extraConfig}
                 }
                 #end easyroam config
               '';
@@ -158,6 +169,8 @@
                 ]
               )
             }
+
+            echo pkcs file sucessfully extracted
 
             ${lib.optionalString cfg.network.configure ''
               # set up wpa_supplicant

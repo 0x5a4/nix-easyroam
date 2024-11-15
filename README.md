@@ -66,7 +66,13 @@ services.easyroam = {
     enable = true;
     pkcsFile = "/path/to/the/file.p12"; # or e.g. config.sops.secrets.easyroam.path
     # its also possible to automatically configure wpa_supplicant
-    network.configure = true;
+    network = {
+        configure = true;
+        # extra config appended to the network block
+        extraConfig = ''
+            priority=5
+        '';
+    };
     # optional, if you want to override the passphrase for the private key file.
     # this doesnt need to be secret, since its useless without the private key file
     privateKeyPassPhrase = "";
