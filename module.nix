@@ -106,9 +106,6 @@ in
 
       wpaUnitServices = builtins.map (x: "${x}.service") wpaUnitNames;
 
-      unitDeps =
-        if cfg.network.backend == "wpa_supplicant" then wpaUnitServices else [ "NetworkManager.service" ];
-
       networkManagerConfig = lib.recursiveUpdate cfg.network.nm.extraConfig {
         connection = {
           id = "eduroam";
@@ -144,9 +141,11 @@ in
 
         wants = [
           "sops-install-secrets.service"
-        ] ++ (lib.optionals cfg.network.configure unitDeps);
+        ] ++ (lib.optionals wantsWpa wpaUnitServices);
 
-        before = lib.optionals cfg.network.configure unitDeps;
+        after = lib.optional wantsNm "NetworkManager.service";
+
+        before = (lib.optionals wantsWpa wpaUnitServices) ++ (lib.optional wantsNm "network-online.target");
 
         serviceConfig.RemainAfterExit = "yes";
 
@@ -239,7 +238,7 @@ in
               # set up NetworkManager
               NMPATH=/run/NetworkManager/system-connections
               mkdir -p "$NMPATH"
-              
+
               sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
             ''}
           '';
@@ -252,9 +251,6 @@ in
             bindsTo = [ "easyroam-install-certs.service" ];
           })
         ))
-        (lib.optionalAttrs wantsNm {
-          NetworkManager.bindsTo = [ "easyroam-install-certs.service" ];
-        })
         {
           easyroam-install-certs = easyroam-unit;
         }
