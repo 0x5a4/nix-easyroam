@@ -127,11 +127,10 @@ in
           altsubject-matches = "DNS:easyroam.eduroam.de;";
           ca-cert = "${cfg.paths.rootCert}";
           client-cert = "${cfg.paths.clientCert}";
-          eap = "tls";
+          eap = "tls;";
           identity = "EASYROAM_IDENTITY_PLACEHOLDER";
           private-key = cfg.paths.privateKey;
           private-key-password = cfg.privateKeyPassPhrase;
-          private-key-password-flags = 0;
         };
         ipv4.method = "auto";
         ipv6 = {
