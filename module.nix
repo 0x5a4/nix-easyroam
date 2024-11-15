@@ -113,7 +113,7 @@ in
         connection = {
           id = "eduroam";
           type = "wifi";
-          interface-name = "wlp82s0";
+          permissions = "";
         };
         wifi = {
           mode = "infrastructure";
@@ -135,7 +135,7 @@ in
         };
         ipv4.method = "auto";
         ipv6 = {
-          addr-gen-mode = "stable-privacy";
+          addr-gen-mode = "default";
           method = "auto";
         };
       };
