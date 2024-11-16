@@ -7,10 +7,10 @@ into multiple certificates.
 
 This module aims to fix these issues by automatically extracting the pkcs file at startup using
 a systemd service (similar to sops). You'll still need to redownload it every few months, but its much less tedious.
-It can also automatically setup `wpa_supplicant` (via `networking.wireless`)
+It can also automatically setup the `wpa_supplicant` or `NetworkManager` connection for you
 
 The extracted Common Name/Root Certificate/Client Certificate/Private Key end up in `/run/easyroam/`, so you
-can use them outside of `wpa_supplicant`.
+can use them externally.
 
 ## Usage
 
@@ -68,10 +68,18 @@ services.easyroam = {
     # its also possible to automatically configure wpa_supplicant
     network = {
         configure = true;
-        # extra config appended to the network block
-        extraConfig = ''
+        # optional, backend to use for configuring the Network.
+        # possible values: wpa_supplicant, NetworkManager
+        # the default is wpa_supplicant
+        backend = "";
+        # optional, extra config appended to the wpa_supplicant network block
+        wpa-supplicant.extraConfig = '';
             priority=5
         '';
+        # optional, extra config appended to the network manager configuration
+        networkmanager.extraConfig = {
+            ipv6.addr-gen-mode = "default";
+        };
     };
     # optional, if you want to override the passphrase for the private key file.
     # this doesnt need to be secret, since its useless without the private key file
