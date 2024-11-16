@@ -146,7 +146,10 @@ in
 
         before = (lib.optionals wantsWpa wpaUnitServices) ++ (lib.optional wantsNm "network-online.target");
 
-        serviceConfig.RemainAfterExit = "yes";
+        serviceConfig = {
+          Type = lib.mkIf wantsNm "oneshot";
+          RemainAfterExit = lib.mkIf wantsWpa "yes";
+        };
 
         script =
           let
