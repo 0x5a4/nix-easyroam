@@ -148,8 +148,7 @@ in
 
         serviceConfig = {
           UMask = "0177";
-          Type = lib.mkIf wantsNm "oneshot";
-          RemainAfterExit = lib.mkIf wantsWpa "yes";
+          RemainAfterExit = "yes";
         };
 
         script =
