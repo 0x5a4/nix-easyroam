@@ -110,7 +110,6 @@ in
         connection = {
           id = "eduroam";
           type = "wifi";
-          permissions = "";
         };
         wifi = {
           mode = "infrastructure";
@@ -131,7 +130,7 @@ in
         };
         ipv4.method = "auto";
         ipv6 = {
-          addr-gen-mode = "default";
+          addr-gen-mode = "stable-privacy";
           method = "auto";
         };
       };
@@ -240,6 +239,8 @@ in
               mkdir -p "$NMPATH"
 
               sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
+
+              ${pkgs.networkmanager}/bin/nmcli connection reload
             ''}
           '';
       };
