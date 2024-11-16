@@ -147,6 +147,7 @@ in
         before = (lib.optionals wantsWpa wpaUnitServices) ++ (lib.optional wantsNm "network-online.target");
 
         serviceConfig = {
+          UMask = "0177";
           Type = lib.mkIf wantsNm "oneshot";
           RemainAfterExit = lib.mkIf wantsWpa "yes";
         };
