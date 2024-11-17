@@ -101,13 +101,11 @@ in
       wantsWpa = cfg.network.configure && cfg.network.backend == "wpa_supplicant";
       wantsNm = cfg.network.configure && cfg.network.backend == "NetworkManager";
 
-      wpaUnitNames =
+      wpaUnitServices =
         if wpaCfg.interfaces == [ ] then
-          [ "wpa_supplicant" ]
+          [ "wpa_supplicant.service" ]
         else
-          builtins.map (x: "wpa_supplicant-${x}") wpaCfg.interfaces;
-
-      wpaUnitServices = builtins.map (x: "${x}.service") wpaUnitNames;
+          builtins.map (x: "wpa_supplicant-${x}.service") wpaCfg.interfaces;
 
       networkManagerConfig = lib.recursiveUpdate cfg.network.networkmanager.extraConfig {
         connection = {
@@ -137,21 +135,18 @@ in
           method = "auto";
         };
       };
-
-      easyroam-unit = {
+    in
+    lib.mkIf cfg.enable {
+      systemd.services.easyroam-install-certs = {
         wantedBy = [ "multi-user.target" ];
+        wants = [ "sops-install-secrets.service" ];
 
-        wants = [
-          "sops-install-secrets.service"
-        ] ++ (lib.optionals wantsWpa wpaUnitServices);
-
-        after = lib.optional wantsNm "NetworkManager.service";
-
-        before = (lib.optionals wantsWpa wpaUnitServices) ++ (lib.optional wantsNm "network-online.target");
+        after = [ "NetworkManager.service" ] ++ wpaUnitServices;
+        before = [ "network-online.target" ];
 
         serviceConfig = {
+          Type = "oneshot";
           UMask = "0177";
-          RemainAfterExit = "yes";
         };
 
         script =
@@ -237,6 +232,23 @@ in
               else
                 cat ${wpaNetworkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
               fi
+
+              echo reloading wpa_supplicant config file
+              ${
+                if wpaCfg.interfaces == [ ] then
+                  ''
+                    for NAME in $(find -H /sys/class/net/* -name wireless | cut -d/ -f 5); do
+                      IFACES+="$NAME"
+                    done
+                  ''
+                else
+                  lib.concatMapStringsSep "\n" (s: "IFACES+=\"${s}\"") wpaCfg.interfaces
+              }
+
+              for IFACE in $IFACES; do 
+                echo reloading interface $IFACE
+                ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
+              done
             ''}
 
             ${lib.optionalString wantsNm ''
@@ -246,23 +258,17 @@ in
 
               sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
 
+              echo reloading network manager connections
               ${pkgs.networkmanager}/bin/nmcli connection reload
+
+              echo success
             ''}
           '';
       };
-    in
-    lib.mkIf cfg.enable {
-      systemd.services = lib.mergeAttrsList [
-        (lib.optionalAttrs wantsWpa (
-          lib.genAttrs wpaUnitNames (x: {
-            bindsTo = [ "easyroam-install-certs.service" ];
-          })
-        ))
-        {
-          easyroam-install-certs = easyroam-unit;
-        }
-      ];
 
-      networking.wireless.allowAuxiliaryImperativeNetworks = lib.mkIf wantsWpa true;
+      networking.wireless = lib.mkIf wantsWpa {
+        allowAuxiliaryImperativeNetworks = true;
+        userControlled.enable = true;
+      };
     };
 }

@@ -117,11 +117,3 @@ Because easyroam is so much easier, you need to redo this every once in a while.
 
 This is most likely because you copy-pasted the certificate for encryption and your editor appended a newline.
 Prefer using `sops encrypt -i` for encrypting the file. This encrypts the file in place.
-
-### easyroam-install-certs fails and now i dont have wifi
-
-This is because `wpa_supplicant` is changed to have a very strong dependency on this service. The relationship
-we need is one of the few that systemd doesnt actually support. Whenever `easyroam-install-certs` restarts,
-we want to also restart `wpa_supplicant`, but if `easyroam-install-certs` fails to start we dont actually want
-to block wpa. This cant be represented without calling `systemctl` within `easyroam-install-certs` startup script,
-so we enforce the strong dependency. Feel free to open an issue if you have a better idea!
