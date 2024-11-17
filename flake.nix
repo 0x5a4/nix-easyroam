@@ -1,5 +1,5 @@
 {
-  description = "A NixOS Module for easyroam";
+  description = "A NixOS Module for setting up easyroam";
 
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -12,49 +12,11 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
-
-      lib = nixpkgs.lib;
-
-      forAllSystems = lib.genAttrs systems;
     in
     {
-      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixfmt-rfc-style);
-
-      nixosModules.nix-easyroam = import ./module.nix;
-
-      packages = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
-        {
-          extract-common-name = pkgs.writeShellApplication {
-            name = "extract-common-name";
-
-            runtimeInputs = with pkgs; [
-              libressl
-              gnused
-            ];
-
-            text = ''
-                if (( $# == 0 )); then
-                    echo "usage: extract-common-name <pkcs-file>"
-                    exit
-                fi
-
-              # garbage hack to get stderr to shut the fuck up
-              bash -c "openssl pkcs12 -in \"$1\" -passin pass: -nokeys | \
-                openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp'" 2>/dev/null
-            '';
-          };
-        }
+      formatter = nixpkgs.lib.genAttrs systems (
+        system: nixpkgs.legacyPackages.${system}.nixfmt-rfc-style
       );
-
-      apps = forAllSystems (system: {
-        extract-common-name = {
-          type = "app";
-          program = "${self.packages.${system}.extract-common-name}/bin/extract-common-name";
-        };
-      });
+      nixosModules.nix-easyroam = import ./module.nix;
     };
 }
