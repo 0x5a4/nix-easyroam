@@ -64,9 +64,9 @@ in
       default = null;
       description = "Group of the certificate files";
     };
-    network = {
-      configure = lib.mkEnableOption "also configure the easyroam network (otherwise only extraction will happen)";
-      wpa-supplicant.extraConfig = lib.mkOption {
+    wpa-supplicant = {
+      enable = lib.mkEnableOption "automatically configure wpa_supplicant";
+      extraConfig = lib.mkOption {
         type = types.lines;
         default = "";
         description = "Extra config to write into the network Block";
@@ -74,32 +74,48 @@ in
           priority=5
         '';
       };
-      networkmanager.extraConfig = lib.mkOption {
+    };
+    networkmanager = {
+      enable = lib.mkEnableOption "automatically configure wpa_supplicant";
+      extraConfig = lib.mkOption {
         type = ini.type;
         default = { };
         description = ''
           Extra config to write into the network manager config.
-          This attrset will be merged with the default, so you can override the default here
+          This attrset will be merged with the default, so you can override it here
         '';
-      };
-      backend = lib.mkOption {
-        type = types.enum [
-          "wpa_supplicant"
-          "NetworkManager"
-        ];
-        default = "wpa_supplicant";
-        description = "Backend to use for configuring the network";
       };
     };
   };
+
+  imports = [
+    (lib.mkRemovedOptionModule [
+      "services"
+      "easyroam"
+      "network"
+      "configure"
+    ] "Use services.easyroam.wpa-supplicant.enable or services.easyroam.networkmanager.enable instead")
+
+    (lib.mkRenamedOptionModule
+      [
+        "services"
+        "easyroam"
+        "network"
+        "extraConfig"
+      ]
+      [
+        "services"
+        "easyroam"
+        "wpa-supplicant"
+        "extraConfig"
+      ]
+    )
+  ];
 
   config =
     let
       cfg = config.services.easyroam;
       wpaCfg = config.networking.wireless;
-
-      wantsWpa = cfg.network.configure && cfg.network.backend == "wpa_supplicant";
-      wantsNm = cfg.network.configure && cfg.network.backend == "NetworkManager";
 
       wpaUnitServices =
         if wpaCfg.interfaces == [ ] then
@@ -107,7 +123,7 @@ in
         else
           builtins.map (x: "wpa_supplicant-${x}.service") wpaCfg.interfaces;
 
-      networkManagerConfig = lib.recursiveUpdate cfg.network.networkmanager.extraConfig {
+      networkManagerConfig = lib.recursiveUpdate cfg.networkmanager.extraConfig {
         connection = {
           id = "eduroam";
           type = "wifi";
@@ -169,7 +185,7 @@ in
                    client_cert="${cfg.paths.clientCert}"
                    private_key="${cfg.paths.privateKey}"
                    private_key_passwd="${cfg.privateKeyPassPhrase}"
-                   ${cfg.network.wpa-supplicant.extraConfig}
+                   ${cfg.wpa-supplicant.extraConfig}
                 }
                 #end easyroam config
               '';
@@ -221,7 +237,7 @@ in
 
             echo pkcs file sucessfully extracted
 
-            ${lib.optionalString wantsWpa ''
+            ${lib.optionalString cfg.wpa-supplicant.enable ''
               # set up wpa_supplicant
               if grep -q "#begin easyroam config" /etc/wpa_supplicant.conf; then
                 # dont know why this is necessary, but if we just make it one big pipe, one of the sed's
@@ -251,7 +267,7 @@ in
               done
             ''}
 
-            ${lib.optionalString wantsNm ''
+            ${lib.optionalString cfg.networkmanager.enable ''
               # set up NetworkManager
               NMPATH=/run/NetworkManager/system-connections
               mkdir -p "$NMPATH"
@@ -266,7 +282,7 @@ in
           '';
       };
 
-      networking.wireless = lib.mkIf wantsWpa {
+      networking.wireless = lib.mkIf cfg.wpa-supplicant.enable {
         allowAuxiliaryImperativeNetworks = true;
         userControlled.enable = true;
       };

@@ -65,19 +65,19 @@ Somewhere in your Nixos Config put:
 services.easyroam = {
     enable = true;
     pkcsFile = "/path/to/the/file.p12"; # or e.g. config.sops.secrets.easyroam.path
-    # its also possible to automatically configure wpa_supplicant
-    network = {
-        configure = true;
-        # optional, backend to use for configuring the Network.
-        # possible values: wpa_supplicant, NetworkManager
-        # the default is wpa_supplicant
-        backend = "";
-        # optional, extra config appended to the wpa_supplicant network block
-        wpa-supplicant.extraConfig = '';
+    # automatically configure wpa-supplicant (use this if you configure your networking via networking.wireless)
+    wpa-supplicant = {
+        enable = true;
+        # optional, extra config to write into the wpa_supplicant network block
+        extraConfig = '';
             priority=5
         '';
-        # optional, extra config appended to the network manager configuration
-        networkmanager.extraConfig = {
+    };
+    # automatically configure NetworkManager
+    networkmanager = {
+        enable = true;
+        # optional, extra config to write into the NetworkManager config
+        extraConfig = {
             ipv6.addr-gen-mode = "default";
         };
     };
