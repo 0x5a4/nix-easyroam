@@ -1,6 +1,6 @@
 # nix-easyroam
 
-Setting up easyroam under NixOs is kind of a pain in the ass. The official app only
+Setting up easyroam under NixOS is kind of a pain in the ass. The official app only
 supports NetworkManager and x86 so if you configure your networks declaratively with nix or have
 a non-x86 laptop you're kind of screwed. The pkcs file you can download also needs to be extracted
 into multiple certificates.
@@ -21,7 +21,7 @@ Go to [easyroam.de](https://easyroam.de), select your University and log in. Und
 ### Step 2 (optional): Encrypt the file using sops
 
 If you dont encrypt the file, it will be copied to the nix-store and will
-be world readable. You also cannot put it into a git repo or something
+be world readable. You also cannot safely put it into a git repo or something
 
 ```bash
 # copy the file into your secrets folder
@@ -31,7 +31,7 @@ cp file.p12 secrets/easyroam
 sops encrypt -i secrets/easyroam
 
 # now setup the sops secret as usual
-# i recommend settings the secrets restartUnits to [ "easyroam-install.service" ]
+# i recommend setting the secrets restartUnits to [ "easyroam-install.service" ]
 ```
 
 ### Step 3: Install the NixOS module
