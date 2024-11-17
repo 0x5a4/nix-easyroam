@@ -109,7 +109,8 @@ services.easyroam = {
 
 ### Step 5: Repeat this every few months
 
-Because easyroam is so much easier, you need to redo this every once in a while.
+Because easyroam is so much easier, you need to redo this every once in a while. Fun Fact: I've been told
+this has no technical reason, but is merely so users dont forget how to set it up (and they'll get less support tickets).
 
 ## Troubleshooting
 
