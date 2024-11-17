@@ -31,7 +31,7 @@ cp file.p12 secrets/easyroam
 sops encrypt -i secrets/easyroam
 
 # now setup the sops secret as usual
-# i recommend settings the secrets restartUnits to [ "easyroam-install-certs.service" ]
+# i recommend settings the secrets restartUnits to [ "easyroam-install.service" ]
 ```
 
 ### Step 3: Install the NixOS module

@@ -153,7 +153,7 @@ in
       };
     in
     lib.mkIf cfg.enable {
-      systemd.services.easyroam-install-certs = {
+      systemd.services.easyroam-install = {
         wantedBy = [ "multi-user.target" ];
         wants = [ "sops-install-secrets.service" ];
 
