@@ -114,6 +114,10 @@ this has no technical reason, but is merely so users dont forget how to set it u
 
 ## Troubleshooting
 
+### Doesnt work
+
+Do you still have your old eduroam connection set up? Remove it and run `sudo systemctl restart easyroam-install.service`.
+
 ### Certificate fails to be extracted
 
 This is most likely because you copy-pasted the certificate for encryption and your editor appended a newline.
