@@ -12,7 +12,7 @@ in
   options.services.easyroam = {
     enable = lib.mkEnableOption "setup easyroam wifi configuration";
     pkcsFile = lib.mkOption {
-      type = types.either types.path types.str;
+      type = types.either types.path types.nonEmptyStr;
       description = ''
         Path to the PKCS12 File (downloaded from the easyroam site).
 
@@ -20,7 +20,7 @@ in
       '';
     };
     privateKeyPassPhrase = lib.mkOption {
-      type = types.str;
+      type = types.nonEmptyStr;
       default = "memezlmao";
       description = ''
         Passphrase for the private key file. This doesnt actually need to be secure,
@@ -29,38 +29,38 @@ in
     };
     paths = {
       commonName = lib.mkOption {
-        type = types.str;
+        type = types.nonEmptyStr;
         description = "path to the common name file";
         default = "/run/easyroam/common-name";
       };
       rootCert = lib.mkOption {
-        type = types.str;
+        type = types.nonEmptyStr;
         description = "path to the root certificate pem file";
         default = "/run/easyroam/root-certificate.pem";
       };
       clientCert = lib.mkOption {
-        type = types.str;
+        type = types.nonEmptyStr;
         description = "path to the client certificate pem file";
         default = "/run/easyroam/client-certificate.pem";
       };
       privateKey = lib.mkOption {
-        type = types.str;
+        type = types.nonEmptyStr;
         description = "path to the private key pem file";
         default = "/run/easyroam/private-key.pem";
       };
     };
     mode = lib.mkOption {
-      type = types.nullOr types.str;
+      type = types.nullOr types.nonEmptyStr;
       default = "0400";
       description = "mode (in octal notation) of the certificate files";
     };
     owner = lib.mkOption {
-      type = types.nullOr types.str;
+      type = types.nullOr types.nonEmptyStr;
       default = null;
       description = "Owner of the certificate files";
     };
     group = lib.mkOption {
-      type = types.nullOr types.str;
+      type = types.nullOr types.nonEmptyStr;
       default = null;
       description = "Group of the certificate files";
     };
