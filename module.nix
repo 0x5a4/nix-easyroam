@@ -151,6 +151,31 @@ in
           method = "auto";
         };
       };
+
+      wpaNetworkBlock = pkgs.writeTextFile {
+        name = "easyroam-wpa-network-block";
+        text = ''
+          #begin easyroam config
+          network={
+             ssid="eduroam"
+             scan_ssid=1
+             key_mgmt=WPA-EAP
+             proto=WPA2
+             eap=TLS
+             pairwise=CCMP
+             group=CCMP
+             altsubject_match="DNS:easyroam.eduroam.de"
+             identity="EASYROAM_IDENTITY_PLACEHOLDER"
+             ca_cert="${cfg.paths.rootCert}"
+             client_cert="${cfg.paths.clientCert}"
+             private_key="${cfg.paths.privateKey}"
+             private_key_passwd="${cfg.privateKeyPassPhrase}"
+             ${cfg.wpa-supplicant.extraConfig}
+          }
+          #end easyroam config
+        '';
+      };
+      nmNetworkBlock = ini.generate "easyroam-nm-network-block" networkManagerConfig;
     in
     lib.mkIf cfg.enable {
       systemd.services.easyroam-install = {
@@ -160,42 +185,41 @@ in
         after = [ "NetworkManager.service" ] ++ wpaUnitServices;
         before = [ "network-online.target" ];
 
-        serviceConfig = {
-          Type = "oneshot";
-          UMask = "0177";
-        };
+        serviceConfig.Type = "oneshot";
 
-        script =
-          let
-            wpaNetworkBlock = pkgs.writeTextFile {
-              name = "easyroam-wpa-network-block";
-              text = ''
-                #begin easyroam config
-                network={
-                   ssid="eduroam"
-                   scan_ssid=1
-                   key_mgmt=WPA-EAP
-                   proto=WPA2
-                   eap=TLS
-                   pairwise=CCMP
-                   group=CCMP
-                   altsubject_match="DNS:easyroam.eduroam.de"
-                   identity="EASYROAM_IDENTITY_PLACEHOLDER"
-                   ca_cert="${cfg.paths.rootCert}"
-                   client_cert="${cfg.paths.clientCert}"
-                   private_key="${cfg.paths.privateKey}"
-                   private_key_passwd="${cfg.privateKeyPassPhrase}"
-                   ${cfg.wpa-supplicant.extraConfig}
-                }
-                #end easyroam config
-              '';
-            };
-            nmNetworkBlock = ini.generate "easyroam-nm-network-block" networkManagerConfig;
-          in
-          ''
-            openssl=${pkgs.libressl}/bin/openssl
+        script = ''
+          openssl=${pkgs.libressl}/bin/openssl
 
-            ${lib.concatMapStringsSep "\n" (str: ''mkdir -p "''$(dirname ${str})"'') (
+          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p "''$(dirname ${str})"'') (
+            with cfg.paths;
+            [
+              commonName
+              rootCert
+              clientCert
+              privateKey
+            ]
+          )}
+
+          # common name
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp' > ${cfg.paths.commonName}
+            
+          # root cert
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys -cacerts > ${cfg.paths.rootCert}
+
+          # client cert 
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 > ${cfg.paths.clientCert}
+
+          # private key
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nocerts -nodes | $openssl rsa -aes256 -passout pass:${cfg.privateKeyPassPhrase} > ${cfg.paths.privateKey}
+
+          # set permissions
+          ${lib.concatMapStringsSep "\n"
+            (str: ''
+              chmod "${cfg.mode}" "${str}"
+              ${lib.optionalString (cfg.owner != null) ''chown "${cfg.owner}" "${str}"''}
+              ${lib.optionalString (cfg.group != null) ''chgrp "${cfg.group}" "${str}"''}
+            '')
+            (
               with cfg.paths;
               [
                 commonName
@@ -203,83 +227,55 @@ in
                 clientCert
                 privateKey
               ]
-            )}
+            )
+          }
 
-            # common name
-            $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp' > ${cfg.paths.commonName}
-              
-            # root cert
-            $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys -cacerts > ${cfg.paths.rootCert}
+          echo pkcs file sucessfully extracted
 
-            # client cert 
-            $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 > ${cfg.paths.clientCert}
+          ${lib.optionalString cfg.wpa-supplicant.enable ''
+            # set up wpa_supplicant
+            if grep -q "#begin easyroam config" /etc/wpa_supplicant.conf; then
+              # dont know why this is necessary, but if we just make it one big pipe, one of the sed's
+              # gets a SIGPIPE and just dies.
+              NETWORK_BLOCK=$(sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${wpaNetworkBlock}" | \
+                sed -re '/#begin easyroam config/,/#end easyroam config/{r /dev/stdin' -e 'd;}' /etc/wpa_supplicant.conf)
+              echo "$NETWORK_BLOCK" > /etc/wpa_supplicant.conf
+            else
+              cat ${wpaNetworkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
+            fi
 
-            # private key
-            $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nocerts -nodes | $openssl rsa -aes256 -passout pass:${cfg.privateKeyPassPhrase} > ${cfg.paths.privateKey}
-
-            # set permissions
-            ${lib.concatMapStringsSep "\n"
-              (str: ''
-                chmod "${cfg.mode}" "${str}"
-                ${lib.optionalString (cfg.owner != null) ''chown "${cfg.owner}" "${str}"''}
-                ${lib.optionalString (cfg.group != null) ''chgrp "${cfg.group}" "${str}"''}
-              '')
-              (
-                with cfg.paths;
-                [
-                  commonName
-                  rootCert
-                  clientCert
-                  privateKey
-                ]
-              )
+            echo reloading wpa_supplicant config file
+            ${
+              if wpaCfg.interfaces == [ ] then
+                ''
+                  for NAME in $(find -H /sys/class/net/* -name wireless | cut -d/ -f 5); do
+                    IFACES+="$NAME"
+                  done
+                ''
+              else
+                lib.concatMapStringsSep "\n" (s: "IFACES+=\"${s}\"") wpaCfg.interfaces
             }
 
-            echo pkcs file sucessfully extracted
+            for IFACE in $IFACES; do 
+              echo reloading interface $IFACE
+              ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
+            done
+          ''}
 
-            ${lib.optionalString cfg.wpa-supplicant.enable ''
-              # set up wpa_supplicant
-              if grep -q "#begin easyroam config" /etc/wpa_supplicant.conf; then
-                # dont know why this is necessary, but if we just make it one big pipe, one of the sed's
-                # gets a SIGPIPE and just dies.
-                NETWORK_BLOCK=$(sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${wpaNetworkBlock}" | \
-                  sed -re '/#begin easyroam config/,/#end easyroam config/{r /dev/stdin' -e 'd;}' /etc/wpa_supplicant.conf)
-                echo "$NETWORK_BLOCK" > /etc/wpa_supplicant.conf
-              else
-                cat ${wpaNetworkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
-              fi
+          ${lib.optionalString cfg.networkmanager.enable ''
+            # set up NetworkManager
+            NMPATH=/run/NetworkManager/system-connections
+            mkdir -p "$NMPATH"
 
-              echo reloading wpa_supplicant config file
-              ${
-                if wpaCfg.interfaces == [ ] then
-                  ''
-                    for NAME in $(find -H /sys/class/net/* -name wireless | cut -d/ -f 5); do
-                      IFACES+="$NAME"
-                    done
-                  ''
-                else
-                  lib.concatMapStringsSep "\n" (s: "IFACES+=\"${s}\"") wpaCfg.interfaces
-              }
+            sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
+            chmod 0600 "''${NMPATH}/eduroam.nmconnection"
 
-              for IFACE in $IFACES; do 
-                echo reloading interface $IFACE
-                ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
-              done
-            ''}
+            echo reloading network manager connections
+            ${pkgs.networkmanager}/bin/nmcli connection reload
 
-            ${lib.optionalString cfg.networkmanager.enable ''
-              # set up NetworkManager
-              NMPATH=/run/NetworkManager/system-connections
-              mkdir -p "$NMPATH"
-
-              sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
-
-              echo reloading network manager connections
-              ${pkgs.networkmanager}/bin/nmcli connection reload
-
-              echo success
-            ''}
-          '';
+            echo success
+          ''}
+        '';
       };
 
       networking.wireless = lib.mkIf cfg.wpa-supplicant.enable {
