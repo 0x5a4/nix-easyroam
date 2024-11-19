@@ -114,9 +114,14 @@ this has no technical reason, but is merely so users dont forget how to set it u
 
 ## Troubleshooting
 
-### Doesnt work
+### Connection cant be established
 
 Do you still have your old eduroam connection set up? Remove it and run `sudo systemctl restart easyroam-install.service`.
+
+### No control socket on service startup
+
+This is because wpa_supplicant hasnt fully started yet, and the `easyroam-install` service cant instruct it to reload the config file.
+I am aware of this issue and I'm trying to fix it. In the meantime, just `sudo systemctl restart easyroam-install.service`
 
 ### Certificate fails to be extracted
 
