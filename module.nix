@@ -260,6 +260,8 @@ in
               echo reloading interface $IFACE
               ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
             done
+            
+            echo success
           ''}
 
           ${lib.optionalString cfg.networkmanager.enable ''
