@@ -258,9 +258,13 @@ in
 
             for IFACE in $IFACES; do 
               echo reloading interface $IFACE
+
+              # wait for the socket to appear
+              timeout 5 ${lib.getExe pkgs.bash} -c "until [ -S /run/wpa_supplicant/$IFACE ]; do sleep 0.5; done"
+              
               ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
             done
-            
+
             echo success
           ''}
 
