@@ -123,7 +123,7 @@ in
         else
           builtins.map (x: "wpa_supplicant-${x}.service") wpaCfg.interfaces;
 
-      networkManagerConfig = lib.recursiveUpdate cfg.networkmanager.extraConfig {
+      nmCfg = lib.recursiveUpdate cfg.networkmanager.extraConfig {
         connection = {
           id = "eduroam";
           type = "wifi";
@@ -175,7 +175,7 @@ in
           #end easyroam config
         '';
       };
-      nmNetworkBlock = ini.generate "easyroam-nm-network-block" networkManagerConfig;
+      nmNetworkBlock = ini.generate "easyroam-nm-network-block" nmCfg;
     in
     lib.mkIf cfg.enable {
       systemd.services.easyroam-install = {
@@ -188,20 +188,25 @@ in
         serviceConfig.RemainAfterExit = "yes";
 
         script = ''
-          openssl=${pkgs.libressl}/bin/openssl
+          openssl="${lib.getExe' pkgs.libressl "openssl"}"
+          sed="${lib.getExe pkgs.gnused}"
 
-          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p "''$(dirname ${str})"'') (
-            with cfg.paths;
-            [
-              commonName
-              rootCert
-              clientCert
-              privateKey
-            ]
+          ${lib.concatMapStringsSep "\n" (str: ''mkdir -p "${str}"'') (
+            lib.unique (
+              builtins.map builtins.dirOf (
+                with cfg.paths;
+                [
+                  commonName
+                  rootCert
+                  clientCert
+                  privateKey
+                ]
+              )
+            )
           )}
 
           # common name
-          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 -noout -subject | sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp' > ${cfg.paths.commonName}
+          $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys | $openssl x509 -noout -subject | $sed -rn 's/.*\/CN=(.*)\/C.*/\1/gp' > ${cfg.paths.commonName}
             
           # root cert
           $openssl pkcs12 -in "${cfg.pkcsFile}" -passin pass: -nokeys -cacerts > ${cfg.paths.rootCert}
@@ -237,14 +242,15 @@ in
             if grep -q "#begin easyroam config" /etc/wpa_supplicant.conf; then
               # dont know why this is necessary, but if we just make it one big pipe, one of the sed's
               # gets a SIGPIPE and just dies.
-              NETWORK_BLOCK=$(sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${wpaNetworkBlock}" | \
-                sed -re '/#begin easyroam config/,/#end easyroam config/{r /dev/stdin' -e 'd;}' /etc/wpa_supplicant.conf)
+              NETWORK_BLOCK=$($sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${wpaNetworkBlock}" | \
+                $sed -re '/#begin easyroam config/,/#end easyroam config/{r /dev/stdin' -e 'd;}' /etc/wpa_supplicant.conf)
               echo "$NETWORK_BLOCK" > /etc/wpa_supplicant.conf
             else
-              cat ${wpaNetworkBlock} | sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
+              cat ${wpaNetworkBlock} | $sed "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" >> /etc/wpa_supplicant.conf
             fi
 
             echo reloading wpa_supplicant config file
+            
             ${
               if wpaCfg.interfaces == [ ] then
                 ''
@@ -253,7 +259,9 @@ in
                   done
                 ''
               else
-                lib.concatMapStringsSep "\n" (s: "IFACES+=\"${s}\"") wpaCfg.interfaces
+                ''
+                  IFACES=(${lib.concatMapStringsSep " " (s: "\"${s}\"") wpaCfg.interfaces})
+                ''
             }
 
             for IFACE in $IFACES; do 
@@ -262,7 +270,7 @@ in
               # wait for the socket to appear
               timeout 5 ${lib.getExe pkgs.bash} -c "until [ -S /run/wpa_supplicant/$IFACE ]; do sleep 0.5; done"
               
-              ${pkgs.wpa_supplicant}/bin/wpa_cli "-i$IFACE" reconfigure
+              ${lib.getExe' pkgs.wpa_supplicant "wpa_cli"} "-i$IFACE" reconfigure
             done
 
             echo success
@@ -273,11 +281,11 @@ in
             NMPATH=/run/NetworkManager/system-connections
             mkdir -p "$NMPATH"
 
-            sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
+            $sed -e "s/EASYROAM_IDENTITY_PLACEHOLDER/''$(cat ${cfg.paths.commonName})/g" "${nmNetworkBlock}" > "''${NMPATH}/eduroam.nmconnection"
             chmod 0600 "''${NMPATH}/eduroam.nmconnection"
 
             echo reloading network manager connections
-            ${pkgs.networkmanager}/bin/nmcli connection reload
+            ${lib.getExe' pkgs.networkmanager "nmcli"} connection reload
 
             echo success
           ''}
