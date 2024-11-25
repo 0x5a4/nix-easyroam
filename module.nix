@@ -185,7 +185,7 @@ in
         after = [ "NetworkManager.service" ] ++ wpaUnitServices;
         before = [ "network-online.target" ];
 
-        serviceConfig.Type = "oneshot";
+        serviceConfig.RemainAfterExit = "yes";
 
         script = ''
           openssl=${pkgs.libressl}/bin/openssl
