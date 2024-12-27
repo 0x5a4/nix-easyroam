@@ -1,13 +1,6 @@
 # nix-easyroam
 
-Setting up easyroam under NixOS is kind of a pain in the ass. The official app only
-supports NetworkManager and x86 so if you configure your networks declaratively with nix or have
-a non-x86 laptop you're kind of screwed. The pkcs file you can download also needs to be extracted
-into multiple certificates.
-
-This module aims to fix these issues by automatically extracting the pkcs file at startup using
-a systemd service (similar to sops). You'll still need to redownload it every few months, but its much less tedious.
-It can also automatically setup the `wpa_supplicant` or `NetworkManager` connection for you
+This module allows you to declaratively set up easyroam using either `wpa_supplicant` or `NetworkManager`. It does so by using a systemd service that extracts the `pkcs` file on startup, similar to how `sops-nix` sets up its secrets. If you dont care about the declarative part, maybe have a look at the [official app](https://search.nixos.org/packages?channel=unstable&show=easyroam-connect-desktop). It only supports `NetworkManager` though.
 
 The extracted Common Name/Root Certificate/Client Certificate/Private Key end up in `/run/easyroam/`, so you
 can use them externally.
@@ -36,12 +29,12 @@ sops encrypt -i secrets/easyroam
 
 ### Step 3: Install the NixOS module
 
-Do something like this in your flake
+Do something like this in your flake (add this repo as an input and import the module)
 
 ```nix
 {
     inputs = {
-        nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+        nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
         nix-easyroam.url = "github:0x5a4/nix-easyroam";
     };
 
@@ -69,21 +62,21 @@ services.easyroam = {
     wpa-supplicant = {
         enable = true;
         # optional, extra config to write into the wpa_supplicant network block
-        extraConfig = '';
-            priority=5
-        '';
+        # extraConfig = '';
+        #    priority=5
+        # '';
     };
     # automatically configure NetworkManager
     networkmanager = {
         enable = true;
         # optional, extra config to write into the NetworkManager config
-        extraConfig = {
-            ipv6.addr-gen-mode = "default";
-        };
+        # extraConfig = {
+        #    ipv6.addr-gen-mode = "default";
+        # };
     };
     # optional, if you want to override the passphrase for the private key file.
     # this doesnt need to be secret, since its useless without the private key file
-    privateKeyPassPhrase = "";
+    # privateKeyPassPhrase = "";
     # optional, if you want to override where the extracted files end up
     # the defaults are:
     # /run/easyroam/common-name/
@@ -93,24 +86,23 @@ services.easyroam = {
     #
     # you can also read these from within your nix config using
     # `config.services.easyroam.paths`
-    paths = {
-       rootCert = "";
-       clientCert = "";
-       privateKey = "";
-       commonName = "";
-    };
+    # paths = {
+    #   rootCert = "";
+    #   clientCert = "";
+    #   privateKey = "";
+    #   commonName = "";
+    # };
     # optional, (permission bits) the files are stored as, (default is 0400 (0r--------))
-    mode = "";
+    # mode = "";
     # optional, owner and group of the files. (default is root)
-    owner = "";
-    group = "";
+    # owner = "";
+    # group = "";
 };
 ```
 
 ### Step 5: Repeat this every few months
 
-Because easyroam is so much easier, you need to redo this every once in a while. Fun Fact: I've been told
-this has no technical reason, but is merely so users dont forget how to set it up (and they'll get less support tickets).
+Because easyroam is so much easier, you need to redo this every once in a while.
 
 ## Troubleshooting
 
