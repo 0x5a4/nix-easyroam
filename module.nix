@@ -250,7 +250,7 @@ in
             fi
 
             echo reloading wpa_supplicant config file
-            
+
             ${
               if wpaCfg.interfaces == [ ] then
                 ''
