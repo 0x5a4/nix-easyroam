@@ -76,7 +76,7 @@ in
       };
     };
     networkmanager = {
-      enable = lib.mkEnableOption "automatically configure wpa_supplicant";
+      enable = lib.mkEnableOption "automatically configure network manager";
       extraConfig = lib.mkOption {
         type = ini.type;
         default = { };
