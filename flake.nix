@@ -2,14 +2,9 @@
   description = "A NixOS Module for setting up easyroam";
 
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-  inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
 
   outputs =
-    {
-      nixpkgs,
-      treefmt-nix,
-      ...
-    }:
+    { nixpkgs, ... }:
     let
       lib = nixpkgs.lib;
 
@@ -25,11 +20,9 @@
     {
       formatter = eachSystem (
         system: pkgs:
-        (lib.flip treefmt-nix.lib.mkWrapper) {
-          projectRootFile = "flake.nix";
-          settings.on-unmatched = "debug";
-          programs.nixfmt.enable = true;
-        } pkgs
+        pkgs.writers.writeBashBin "fmt" ''
+          find . -type f -name \*.nix | xargs ${lib.getExe pkgs.nixfmt-rfc-style}
+        ''
       );
 
       nixosModules.nix-easyroam = import ./module.nix;
